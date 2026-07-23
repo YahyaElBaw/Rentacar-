@@ -123,6 +123,11 @@ export class ContratService {
 
     const savedContrat = await createdContrat.save();
 
+    // Auto-update car's dailyRate to match the contract's rate
+    if (dailyRate > 0 && dailyRate !== car.dailyRate) {
+      await this.carModel.findByIdAndUpdate(car._id, { dailyRate }).exec();
+    }
+
     // Create a Depense (Expense) for the contract fee if it exists
     if (taxAmount > 0) {
       await new this.depenseModel({
@@ -387,6 +392,11 @@ export class ContratService {
       .populate({ path: 'clients', model: 'Client' })
       .populate('createdBy', 'firstName lastName')
       .exec();
+
+    // Auto-update car's dailyRate if the contract rate changed
+    if (dailyRate > 0 && dailyRate !== car.dailyRate) {
+      await this.carModel.findByIdAndUpdate(carId, { dailyRate }).exec();
+    }
 
     // Manage availability
     if (carChanged || oldStatus !== newStatus) {

@@ -24,6 +24,9 @@ export class Reservation {
   @Prop({ default: 0 })
   totalAmount: number;
 
+  @Prop({ default: 0 })
+  dailyRate: number;
+
   @Prop({ type: Types.ObjectId, ref: 'Contrat' })
   contrat: Types.ObjectId;
 }

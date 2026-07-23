@@ -351,7 +351,7 @@ export class DashboardService {
         { birthday: null },
         { address: { $in: [null, ''] } },
         { cinFront: { $in: [null, ''] } },
-        { cinBack: { $in: [null, ''] } },
+        { $and: [{ idCardType: { $ne: 'passport' } }, { cinBack: { $in: [null, ''] } }] },
         { licenseFront: { $in: [null, ''] } },
         { licenseBack: { $in: [null, ''] } }
       ]

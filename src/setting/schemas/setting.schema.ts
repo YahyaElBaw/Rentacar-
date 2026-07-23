@@ -23,6 +23,9 @@ export class Setting {
 
   @Prop({ default: 6 })
   visiteLimit: number;
+
+  @Prop({ type: [String], default: [] })
+  agencies: string[];
 }
 
 export type SettingDocument = Setting & Document;

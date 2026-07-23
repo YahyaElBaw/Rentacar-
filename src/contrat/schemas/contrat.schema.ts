@@ -72,6 +72,9 @@ export class Contrat {
 
   @Prop({ default: 0 })
   tvaValue: number;
+
+  @Prop({ default: '' })
+  agency: string;
 }
 
 export type ContratDocument = Contrat & Document;

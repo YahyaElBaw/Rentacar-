@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfMake = require('pdfmake');
 import * as path from 'path';
-import * as fs from 'fs';
+import * as https from 'https';
 
 @Injectable()
 export class PdfService {
@@ -44,20 +44,33 @@ export class PdfService {
   private async getImageData(imagePath: string): Promise<string | null> {
     if (!imagePath) return null;
     try {
-      // In NestJS, images are usually in public/uploads if served by ServeStatic
-      const fullPath = path.join(process.cwd(), 'public', imagePath);
-      if (!fs.existsSync(fullPath)) {
-        console.warn(`Image not found at path: ${fullPath}`);
+      if (!imagePath.startsWith('http')) {
+        console.warn(`Image path is not a URL: ${imagePath}`);
         return null;
       }
-      const data = fs.readFileSync(fullPath);
-      const base64 = data.toString('base64');
-      const ext = path.extname(fullPath).toLowerCase().replace('.', '');
-      return `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${base64}`;
+      return await this.fetchImageAsBase64(imagePath);
     } catch (e) {
-      console.error('Failed to read image', e);
+      console.error('Failed to fetch image', e);
       return null;
     }
+  }
+
+  private fetchImageAsBase64(url: string): Promise<string | null> {
+    return new Promise((resolve, reject) => {
+      https.get(url, (response) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('end', () => {
+          const data = Buffer.concat(chunks);
+          const base64 = data.toString('base64');
+          const contentType = response.headers['content-type'] || 'image/jpeg';
+          resolve(`data:${contentType};base64,${base64}`);
+        });
+      }).on('error', (err) => {
+        console.error('Failed to fetch image from Cloudinary', err);
+        resolve(null);
+      });
+    });
   }
 
   async generateContractPDF(contrat: any): Promise<Buffer> {
@@ -140,6 +153,9 @@ export class PdfService {
           },
           layout: 'lightHorizontalLines'
         },
+        contrat.agency ? [
+          { text: `Agence: ${contrat.agency}`, style: 'tdValue', margin: [0, 8, 0, 0] }
+        ] : [],
 
         // Section 3: BILAN DE RETOUR (Only if closed)
         isClosed ? [

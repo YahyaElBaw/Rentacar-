@@ -11,22 +11,22 @@ import { VisiteModule } from './visite/visite.module';
 import { VidangeModule } from './vidange/vidange.module';
 import { DepenseModule } from './depense/depense.module';
 import { DashboardModule } from './dashboard/dashboard.module';
-import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
+
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { UploadModule } from './upload/upload.module';
 import { JourneeModule } from './journee/journee.module';
 import { SharedModule } from './shared/shared.module';
 import { SettingModule } from './setting/setting.module';
+import { AgenceModule } from './agence/agence.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://localhost:27017/rentacar'),
-    ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'public'),
-      serveRoot: '/',
+    MongooseModule.forRoot(process.env.MONGODB_URI!, {
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
+      bufferCommands: false,
     }),
     SharedModule,
     CarModule,
@@ -42,6 +42,7 @@ import { SettingModule } from './setting/setting.module';
     UploadModule,
     JourneeModule,
     SettingModule,
+    AgenceModule,
   ],
   controllers: [AppController],
   providers: [AppService],
