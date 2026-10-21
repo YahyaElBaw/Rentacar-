@@ -17,7 +17,10 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "fix:logs": "ts-node scripts/fix-logs-actor.ts",
+    "clear:gps-history": "ts-node scripts/clear-gps-history.ts",
+    "backup:db": "ts-node scripts/copy-db.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -27,8 +30,10 @@
     "@nestjs/mongoose": "^11.0.4",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/platform-socket.io": "^11.1.29",
     "@nestjs/schedule": "^6.1.1",
     "@nestjs/serve-static": "^5.0.4",
+    "@nestjs/websockets": "^11.1.29",
     "@types/busboy": "^1.5.4",
     "@types/pdfmake": "^0.3.2",
     "bcrypt": "^6.0.0",
@@ -41,7 +46,8 @@
     "pdfmake": "^0.3.7",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "serverless-http": "^4.0.0"
+    "serverless-http": "^4.0.0",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

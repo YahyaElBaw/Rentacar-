@@ -1,4 +1,16 @@
-import { Controller, Get, Delete, Param, UseGuards, Res, Body, Req, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Delete,
+  Param,
+  UseGuards,
+  Res,
+  Body,
+  Req,
+  UnauthorizedException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { JourneeService } from './journee.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -23,21 +35,27 @@ export class JourneeController {
   @UseGuards(RolesGuard)
   @Roles('admin')
   @Delete(':id')
-  async remove(@Param('id') id: string, @Body('password') password: string, @Req() req: any) {
+  async remove(
+    @Param('id') id: string,
+    @Body('password') password: string,
+    @Req() req: any,
+  ) {
     const userId = req.user.id;
     const user = await this.usersService.findById(userId);
 
-    if (!user || user.role !== 'admin') {
+    if (!user || !['admin', 'super_admin'].includes(user.role)) {
       throw new ForbiddenException('Only administrators can delete a journee');
     }
 
     if (!password) {
-      throw new UnauthorizedException('Password is required to delete a journee');
+      throw new UnauthorizedException(
+        'Password is required to delete a journee',
+      );
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      throw new UnauthorizedException('Invalid password');
+      throw new BadRequestException('Invalid password');
     }
 
     return this.journeeService.remove(id);

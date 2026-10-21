@@ -26,6 +26,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
     console.log(`User validated successfully: ${user.cin} (${user.role})`);
-    return { id: user._id, cin: user.cin, role: user.role };
+    return {
+      id: user._id,
+      cin: user.cin,
+      role: user.role,
+      name: `${user.firstName} ${user.lastName}`,
+    };
   }
 }

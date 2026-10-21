@@ -15,7 +15,7 @@ export class Reservation {
   @Prop({ required: true })
   endDate: Date;
 
-  @Prop({ default: 'pending', enum: ['pending', 'confirmed', 'cancelled'] })
+  @Prop({ default: 'pending', enum: ['pending', 'confirmed', 'cancelled', 'converted'] })
   status: string;
 
   @Prop()
@@ -38,3 +38,9 @@ ReservationSchema.index({ car: 1 });
 ReservationSchema.index({ clients: 1 });
 ReservationSchema.index({ status: 1 });
 ReservationSchema.index({ startDate: 1 });
+ReservationSchema.index({ endDate: 1 });
+// Compound index for BookingConflictService.findConflicts() query pattern
+ReservationSchema.index({ car: 1, status: 1, startDate: 1, endDate: 1 });
+// Covered compound index for distinct('car') availability lookups
+ReservationSchema.index({ status: 1, startDate: 1, endDate: 1, car: 1 });
+ReservationSchema.index({ createdAt: -1 });

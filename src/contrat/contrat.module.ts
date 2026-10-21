@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ContratController } from './contrat.controller';
 import { ContratService } from './contrat.service';
@@ -11,6 +11,7 @@ import { ReservationModule } from '../reservation/reservation.module';
 // Removed PdfService import - now provided by SharedModule
 import { SettingModule } from '../setting/setting.module';
 import { DepenseModule } from '../depense/depense.module';
+import { LotContratModule } from '../lot-contrat/lot-contrat.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { DepenseModule } from '../depense/depense.module';
     ReservationModule,
     SettingModule,
     DepenseModule,
+    LotContratModule,
   ],
   controllers: [ContratController],
   providers: [ContratService],

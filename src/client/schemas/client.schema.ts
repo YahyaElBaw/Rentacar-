@@ -15,13 +15,16 @@ export class Client {
   @Prop()
   birthday: Date;
 
+  @Prop({ default: '' })
+  lieuNaissance: string;
+
   @Prop({ default: 'cin', enum: ['cin', 'passport', 'carte_sejour'] })
   idCardType: string;
 
-  @Prop({ required: true, unique: true })
+  @Prop({ unique: true, sparse: true })
   cin: string;
 
-  @Prop({ required: true, unique: true })
+  @Prop({ unique: true, sparse: true })
   drivingLicense: string;
 
   @Prop()
@@ -30,7 +33,16 @@ export class Client {
   @Prop()
   licenseDate: Date;
 
-  @Prop({ required: true })
+  @Prop({ default: '' })
+  lieuPermis: string;
+
+  @Prop({ default: '' })
+  nationality: string;
+
+  @Prop({ default: '' })
+  phoneCountryCode: string;
+
+  @Prop({ default: '' })
   phone: string;
 
   @Prop()
@@ -39,7 +51,10 @@ export class Client {
   @Prop()
   address: string;
 
-  @Prop({ default: 'WHITE_LIST', enum: ['WHITE_LIST', 'BLACK_LIST', 'BLOCK_LIST'] })
+  @Prop({
+    default: 'WHITE_LIST',
+    enum: ['WHITE_LIST', 'BLACK_LIST', 'BLOCK_LIST'],
+  })
   status: string;
 
   @Prop()
@@ -67,6 +82,6 @@ export class Client {
 export type ClientDocument = Client & Document;
 export const ClientSchema = SchemaFactory.createForClass(Client);
 
-
 ClientSchema.index({ lastName: 1 });
 ClientSchema.index({ totalRents: -1 });
+ClientSchema.index({ disabled: 1 });

@@ -2,42 +2,66 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Car, CarDocument } from './schemas/car.schema';
+import { Reservation, ReservationDocument } from '../reservation/schemas/reservation.schema';
+import { Contrat, ContratDocument } from '../contrat/schemas/contrat.schema';
 import { BookingConflictService } from '../shared/booking-conflict.service';
+import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
 export class CarService {
   constructor(
     @InjectModel(Car.name) private carModel: Model<CarDocument>,
-    private readonly bookingConflictService: BookingConflictService
+    @InjectModel(Reservation.name) private reservationModel: Model<ReservationDocument>,
+    @InjectModel(Contrat.name) private contratModel: Model<ContratDocument>,
+    private readonly bookingConflictService: BookingConflictService,
+    private readonly eventsGateway: EventsGateway,
   ) {}
 
   async create(createCarDto: any): Promise<CarDocument> {
     const createdCar = new this.carModel(createCarDto) as CarDocument;
-    return await createdCar.save();
+    const savedCar = await createdCar.save();
+    this.eventsGateway.broadcastDataChange('car:change', {
+      action: 'created',
+      carId: savedCar._id,
+    });
+    return savedCar;
   }
 
   async findAvailable(startDate: Date, endDate: Date): Promise<CarDocument[]> {
-    const allCars = await this.carModel.find({ disabled: false }).exec();
-    
-    const availableCars = [];
-    for (const car of allCars) {
-      const conflictResult = await this.bookingConflictService.findConflicts(
-        (car as any)._id.toString(),
-        startDate,
-        endDate
-      );
-      
-      if (!conflictResult.hasConflicts) {
-        availableCars.push(car);
-      }
+    // Run all 3 queries in parallel: cars + reservations + contracts
+    const [allCars, bookedByReservation, bookedByContract] = await Promise.all([
+      this.carModel
+        .find({ disabled: { $ne: true } })
+        .select('brand model matricule color dailyRate mileage isAvailable agence category departureDate nextTechnicalVisitDate nextOilChangeMileage insuranceDate disabled createdAt')
+        .lean()
+        .exec(),
+      this.reservationModel
+        .distinct('car', {
+          status: { $in: ['confirmed', 'pending'] },
+          startDate: { $lt: endDate },
+          endDate: { $gt: startDate },
+        })
+        .exec(),
+      this.contratModel
+        .distinct('car', {
+          status: { $in: ['active', 'soon'] },
+          startDate: { $lt: endDate },
+          endDate: { $gt: startDate },
+        })
+        .exec(),
+    ]);
+
+    const bookedIds = new Set<string>();
+    for (const id of [...bookedByReservation, ...bookedByContract]) {
+      if (id) bookedIds.add(id.toString());
     }
-    
-    return availableCars;
+
+    return allCars.filter(car => !bookedIds.has((car as any)._id.toString()));
   }
 
   async findAll(filters: any = {}): Promise<CarDocument[]> {
     const query: any = {};
-    
+
     if (filters.disabled === 'true') {
       query.disabled = true;
     } else {
@@ -46,50 +70,137 @@ export class CarService {
 
     if (filters.brand) query['brand'] = new RegExp(filters.brand, 'i');
     if (filters.category) query['category'] = filters.category;
-    if (filters.isAvailable !== undefined) query['isAvailable'] = filters.isAvailable;
+    if (filters.isAvailable !== undefined)
+      query['isAvailable'] = filters.isAvailable;
 
-    let cars = await this.carModel.find(query).exec();
+    let cars = await this.carModel
+      .find(query)
+      .select('brand model matricule color dailyRate mileage isAvailable agence category departureDate nextTechnicalVisitDate nextOilChangeMileage insuranceDate disabled createdAt')
+      .populate('agence', 'name')
+      .lean()
+      .exec();
 
     if (filters.isAvailable) {
-      const now = new Date();
-      const startOfDay = new Date(now.setHours(0, 0, 0, 0));
-      const endOfDay = new Date(now.setHours(23, 59, 59, 999));
-      
-      const filtered = [];
-      for (const car of cars) {
-        const conflicts = await this.bookingConflictService.findConflicts(
-          (car as any)._id.toString(),
-          startOfDay,
-          endOfDay
-        );
-        if (!conflicts.hasConflicts) {
-          filtered.push(car);
-        }
-      }
-      cars = filtered;
+      // Batch approach: single aggregation to get all booked car IDs for today
+      // instead of firing 2 queries per car in a loop (N+1 anti-pattern)
+      const bookedCarIds = await this.getBookedCarIdsToday();
+      cars = cars.filter(car => !bookedCarIds.has((car as any)._id.toString()));
     }
 
-    return cars;
+    return cars as any;
+  }
+
+  /**
+   * Returns a Set of car IDs that have active bookings (contracts or reservations)
+   * overlapping today. Uses 2 aggregations instead of 2N per-car queries.
+   */
+  private async getBookedCarIdsToday(): Promise<Set<string>> {
+    const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const dateOverlapFilter = {
+      startDate: { $lt: endOfDay },
+      endDate: { $gt: startOfDay },
+    };
+
+    const [bookedByReservation, bookedByContract] = await Promise.all([
+      this.reservationModel
+        .distinct('car', {
+          status: { $in: ['confirmed', 'pending'] },
+          ...dateOverlapFilter,
+        })
+        .exec(),
+      this.contratModel
+        .distinct('car', {
+          status: { $in: ['active', 'soon'] },
+          ...dateOverlapFilter,
+        })
+        .exec(),
+    ]);
+
+    const ids = new Set<string>();
+    for (const id of [...bookedByReservation, ...bookedByContract]) {
+      ids.add(id.toString());
+    }
+    return ids;
   }
 
   async findOne(id: string): Promise<CarDocument> {
-    const car = await this.carModel.findById(id)
+    const car = (await this.carModel
+      .findById(id)
+      .populate('agence')
       .populate('reservations')
       .populate('visites')
       .populate('vidanges')
       .populate('depenses')
-      .exec() as CarDocument;
+      .exec()) as CarDocument;
     if (!car) throw new NotFoundException(`Car with ID ${id} not found`);
     return car;
   }
 
   async update(id: string, updateCarDto: any): Promise<CarDocument> {
-    const car = await this.carModel.findByIdAndUpdate(id, updateCarDto, { new: true }).exec() as CarDocument;
+    const car = (await this.carModel
+      .findByIdAndUpdate(id, updateCarDto, { new: true })
+      .exec()) as CarDocument;
     if (!car) throw new NotFoundException(`Car with ID ${id} not found`);
+    this.eventsGateway.broadcastDataChange('car:change', {
+      action: 'updated',
+      carId: car._id,
+    });
     return car;
   }
 
+  async addDocument(
+    id: string,
+    document: Partial<Car['documents'][number]>,
+  ): Promise<any> {
+    const car = await this.carModel
+      .findByIdAndUpdate(
+        id,
+        { $push: { documents: document } },
+        { new: true },
+      )
+      .exec();
+    if (!car) throw new NotFoundException(`Car with ID ${id} not found`);
+    this.eventsGateway.broadcastDataChange('car:change', {
+      action: 'updated',
+      carId: car._id,
+    });
+    return car.documents[car.documents.length - 1];
+  }
+
+  async removeDocument(id: string, documentId: string): Promise<any> {
+    const car = await this.carModel
+      .findByIdAndUpdate(
+        id,
+        { $pull: { documents: { _id: documentId } } },
+        { new: true },
+      )
+      .exec();
+    if (!car) throw new NotFoundException(`Car with ID ${id} not found`);
+    this.eventsGateway.broadcastDataChange('car:change', {
+      action: 'updated',
+      carId: car._id,
+    });
+    return { deleted: true };
+  }
+
   async remove(id: string): Promise<any> {
-    return await this.carModel.findByIdAndUpdate(id, { disabled: true, isAvailable: false }, { new: true }).exec();
+    const result = await this.carModel
+      .findByIdAndUpdate(
+        id,
+        { disabled: true, isAvailable: false },
+        { new: true },
+      )
+      .exec();
+    this.eventsGateway.broadcastDataChange('car:change', {
+      action: 'removed',
+      carId: id,
+    });
+    return result;
   }
 }
+

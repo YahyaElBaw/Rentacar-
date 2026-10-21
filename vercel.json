@@ -3,13 +3,22 @@
   "builds": [
     {
       "src": "api/index.ts",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "maxDuration": 30
+      }
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
       "dest": "api/index.ts"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/gps/sync",
+      "schedule": "0 3 * * *"
     }
   ]
 }

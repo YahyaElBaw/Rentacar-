@@ -12,12 +12,12 @@ export class Journee {
   @Prop([
     {
       entryType: { type: String, default: '' }, // new field going forward
-      type: { type: String, default: '' },       // kept for reading old records
+      type: { type: String, default: '' }, // kept for reading old records
       description: { type: String, default: '' },
       amount: { type: Number, default: 0 },
       reference: { type: String, default: '' },
-      time: { type: Date, default: Date.now }
-    }
+      time: { type: Date, default: Date.now },
+    },
   ])
   entries: any[];
 
@@ -27,6 +27,3 @@ export class Journee {
 
 export type JourneeDocument = Journee & Document;
 export const JourneeSchema = SchemaFactory.createForClass(Journee);
-
-// Ensure index on date for fast retrieval
-JourneeSchema.index({ date: 1 });

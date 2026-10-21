@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CarModule } from './car/car.module';
@@ -11,23 +12,36 @@ import { VisiteModule } from './visite/visite.module';
 import { VidangeModule } from './vidange/vidange.module';
 import { DepenseModule } from './depense/depense.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { GpsModule } from './gps/gps.module';
 
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { UploadModule } from './upload/upload.module';
-import { JourneeModule } from './journee/journee.module';
 import { SharedModule } from './shared/shared.module';
 import { SettingModule } from './setting/setting.module';
 import { AgenceModule } from './agence/agence.module';
+import { LotContratModule } from './lot-contrat/lot-contrat.module';
+import { LogModule } from './log/log.module';
+import { EventsModule } from './events/events.module';
+import { PresenceModule } from './presence/presence.module';
+import { PresenceInterceptor } from './presence/presence.interceptor';
+import { DatabaseModule } from './database/database.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    MongooseModule.forRoot(process.env.MONGODB_URI!, {
-      serverSelectionTimeoutMS: 10000,
-      connectTimeoutMS: 10000,
-      bufferCommands: false,
+    MongooseModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        uri:
+          config.get<string>('MONGODB_URI') || 'mongodb://127.0.0.1:27017/rentacar',
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 5000,
+      }),
     }),
+    DatabaseModule,
+    EventsModule,
+    PresenceModule,
     SharedModule,
     CarModule,
     ClientModule,
@@ -37,14 +51,20 @@ import { AgenceModule } from './agence/agence.module';
     VidangeModule,
     DepenseModule,
     DashboardModule,
+    GpsModule,
     AuthModule,
     UsersModule,
     UploadModule,
-    JourneeModule,
     SettingModule,
     AgenceModule,
+    LotContratModule,
+    LogModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_INTERCEPTOR, useClass: PresenceInterceptor },
+  ],
 })
 export class AppModule {}
+

@@ -5,7 +5,9 @@ import { Setting, SettingDocument } from './schemas/setting.schema';
 
 @Injectable()
 export class SettingService implements OnModuleInit {
-  constructor(@InjectModel(Setting.name) private settingModel: Model<SettingDocument>) {}
+  constructor(
+    @InjectModel(Setting.name) private settingModel: Model<SettingDocument>,
+  ) {}
 
   async onModuleInit() {
     const count = await this.settingModel.countDocuments();
@@ -28,7 +30,9 @@ export class SettingService implements OnModuleInit {
   }
 
   async updateSettings(data: Partial<Setting>): Promise<SettingDocument> {
-    const settings = await this.settingModel.findOneAndUpdate({}, data, { new: true }).exec();
+    const settings = await this.settingModel
+      .findOneAndUpdate({}, { $set: data }, { new: true })
+      .exec();
     if (!settings) {
       return this.settingModel.create(data);
     }

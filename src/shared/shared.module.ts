@@ -1,7 +1,10 @@
 import { Module, Global } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { BookingConflictService } from './booking-conflict.service';
-import { Reservation, ReservationSchema } from '../reservation/schemas/reservation.schema';
+import {
+  Reservation,
+  ReservationSchema,
+} from '../reservation/schemas/reservation.schema';
 import { Contrat, ContratSchema } from '../contrat/schemas/contrat.schema';
 import { Client, ClientSchema } from '../client/schemas/client.schema';
 

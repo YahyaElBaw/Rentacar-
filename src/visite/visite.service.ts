@@ -8,17 +8,21 @@ import { Depense, DepenseDocument } from '../depense/schemas/depense.schema';
 @Injectable()
 export class VisiteService {
   constructor(
-    @InjectModel(Visite.name) private readonly visiteModel: Model<VisiteDocument>,
+    @InjectModel(Visite.name)
+    private readonly visiteModel: Model<VisiteDocument>,
     @InjectModel(Car.name) private readonly carModel: Model<CarDocument>,
-    @InjectModel(Depense.name) private readonly depenseModel: Model<DepenseDocument>,
+    @InjectModel(Depense.name)
+    private readonly depenseModel: Model<DepenseDocument>,
   ) {}
 
   async create(createVisiteDto: any): Promise<VisiteDocument> {
     const car = await this.carModel.findById(createVisiteDto.car).exec();
     if (!car) throw new NotFoundException('Car not found');
 
-    const createdVisite = new this.visiteModel(createVisiteDto) as VisiteDocument;
-    
+    const createdVisite = new this.visiteModel(
+      createVisiteDto,
+    ) as VisiteDocument;
+
     // Auto-calculate next visit date if not provided (6 months later)
     if (!createdVisite.nextVisitDate) {
       const nextDate = new Date(createdVisite.date);
@@ -34,18 +38,20 @@ export class VisiteService {
       date: savedVisite.date,
       amount: savedVisite.cost,
       category: 'VISITE',
-      description: `Visite Technique auto | KM: ${savedVisite.mileageAtVisit} | Résultat: ${savedVisite.result}`
+      description: `Visite Technique auto | KM: ${savedVisite.mileageAtVisit} | Résultat: ${savedVisite.result}`,
     });
     const savedDepense = await createdDepense.save();
 
     // 3. Update Car record: link the visit, depense and update the nextTechnicalVisitDate
-    await this.carModel.findByIdAndUpdate(car._id, { 
-      $push: { 
-        visites: savedVisite._id,
-        depenses: savedDepense._id
-      },
-      nextTechnicalVisitDate: savedVisite.nextVisitDate
-    }).exec();
+    await this.carModel
+      .findByIdAndUpdate(car._id, {
+        $push: {
+          visites: savedVisite._id,
+          depenses: savedDepense._id,
+        },
+        nextTechnicalVisitDate: savedVisite.nextVisitDate,
+      })
+      .exec();
     return savedVisite;
   }
 
@@ -65,29 +71,40 @@ export class VisiteService {
     if (!visite) throw new NotFoundException(`Visite with ID ${id} not found`);
 
     // Remove related depense
-    await this.depenseModel.findOneAndDelete({
-      car: visite.car,
-      date: visite.date,
-      amount: visite.cost,
-      category: 'VISITE'
-    }).exec();
+    await this.depenseModel
+      .findOneAndDelete({
+        car: visite.car,
+        date: visite.date,
+        amount: visite.cost,
+        category: 'VISITE',
+      })
+      .exec();
 
-    await this.carModel.findByIdAndUpdate(visite.car, { 
-      $pull: { visites: id } 
-    }).exec();
+    await this.carModel
+      .findByIdAndUpdate(visite.car, {
+        $pull: { visites: id },
+      })
+      .exec();
 
     return await this.visiteModel.findByIdAndDelete(id).exec();
   }
 
   async update(id: string, updateVisiteDto: any): Promise<VisiteDocument> {
-    const visite = await this.visiteModel.findByIdAndUpdate(id, updateVisiteDto, { new: true }).exec();
+    const visite = await this.visiteModel
+      .findByIdAndUpdate(id, updateVisiteDto, { new: true })
+      .exec();
     if (!visite) throw new NotFoundException(`Visite with ID ${id} not found`);
 
     // Sync with depense if needed (simplified)
-    await this.depenseModel.findOneAndUpdate(
-      { car: visite.car, date: visite.date, category: 'VISITE' },
-      { amount: visite.cost, description: `Visite Technique auto | KM: ${visite.mileageAtVisit} | Résultat: ${visite.result}` }
-    ).exec();
+    await this.depenseModel
+      .findOneAndUpdate(
+        { car: visite.car, date: visite.date, category: 'VISITE' },
+        {
+          amount: visite.cost,
+          description: `Visite Technique auto | KM: ${visite.mileageAtVisit} | Résultat: ${visite.result}`,
+        },
+      )
+      .exec();
 
     return visite;
   }

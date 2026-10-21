@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, Delete, Query, Patch } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Delete,
+  Query,
+  Patch,
+} from '@nestjs/common';
 import { VisiteService } from './visite.service';
 
 @Controller('visites')

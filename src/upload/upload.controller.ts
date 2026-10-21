@@ -1,4 +1,10 @@
-import { Controller, Post, Req, BadRequestException, Inject } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Req,
+  BadRequestException,
+  Inject,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { CLOUDINARY } from '../cloudinary/cloudinary.provider';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -16,14 +22,21 @@ export class UploadController {
 
       const busboy = Busboy({ headers: req.headers });
 
-      busboy.on('file', (fieldname: string, file: NodeJS.ReadableStream, info: { filename: string; encoding: string; mimeType: string }) => {
-        originalName = info.filename;
-        const chunks: Buffer[] = [];
-        file.on('data', (chunk: Buffer) => chunks.push(chunk));
-        file.on('end', () => {
-          fileBuffer = Buffer.concat(chunks);
-        });
-      });
+      busboy.on(
+        'file',
+        (
+          fieldname: string,
+          file: NodeJS.ReadableStream,
+          info: { filename: string; encoding: string; mimeType: string },
+        ) => {
+          originalName = info.filename;
+          const chunks: Buffer[] = [];
+          file.on('data', (chunk: Buffer) => chunks.push(chunk));
+          file.on('end', () => {
+            fileBuffer = Buffer.concat(chunks);
+          });
+        },
+      );
 
       busboy.on('finish', async () => {
         if (!fileBuffer) {
@@ -32,20 +45,23 @@ export class UploadController {
         }
 
         try {
-          const result = await new Promise<any>((resolveUpload, rejectUpload) => {
-            const uploadStream = this.cloudinary.uploader.upload_stream(
-              {
-                resource_type: 'auto',
-                folder: 'RentACarData',
-                public_id: originalName.replace(/\.[^/.]+$/, '') + '-' + Date.now(),
-              },
-              (error: any, result: any) => {
-                if (error) rejectUpload(error);
-                else resolveUpload(result);
-              },
-            );
-            uploadStream.end(fileBuffer!);
-          });
+          const result = await new Promise<any>(
+            (resolveUpload, rejectUpload) => {
+              const uploadStream = this.cloudinary.uploader.upload_stream(
+                {
+                  resource_type: 'auto',
+                  folder: 'RentACarData',
+                  public_id:
+                    originalName.replace(/\.[^/.]+$/, '') + '-' + Date.now(),
+                },
+                (error: any, result: any) => {
+                  if (error) rejectUpload(error);
+                  else resolveUpload(result);
+                },
+              );
+              uploadStream.end(fileBuffer!);
+            },
+          );
 
           resolve({ url: result.secure_url });
         } catch (err) {

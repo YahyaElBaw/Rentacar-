@@ -15,7 +15,11 @@ export class Reservation extends Document {
   @Prop({ required: true })
   endDate: Date;
 
-  @Prop({ required: true, enum: ['pending', 'confirmed', 'cancelled'], default: 'pending' })
+  @Prop({
+    required: true,
+    enum: ['pending', 'confirmed', 'cancelled'],
+    default: 'pending',
+  })
   status: string;
 
   @Prop({ required: true })
@@ -89,7 +93,11 @@ export class Depense extends Document {
   @Prop({ required: true })
   date: Date;
 
-  @Prop({ required: true, enum: ['repair', 'insurance', 'tax', 'fuel', 'other'], default: 'other' })
+  @Prop({
+    required: true,
+    enum: ['repair', 'insurance', 'tax', 'fuel', 'other'],
+    default: 'other',
+  })
   category: string;
 
   @Prop({ required: true })

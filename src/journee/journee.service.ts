@@ -17,23 +17,28 @@ export class JourneeService {
 
   async getOrCreateCurrent(): Promise<JourneeDocument> {
     const today = this.getTodayString();
-    let journee = await this.journeeModel.findOne({ date: today }).exec();
-
-    if (!journee) {
-      journee = new this.journeeModel({
-        date: today,
-        status: 'open',
-        entries: [],
-        totalDaily: 0,
-      });
-      await journee.save();
-    } else if (journee.status === 'closed') {
-      // If today is somehow closed but we need an entry (rare case), 
-      // we might want to log somewhere else, but for now we won't reopen it.
-      this.logger.warn(`Attempted to access closed Journee for ${today}`);
+    try {
+      const journee = await this.journeeModel
+        .findOneAndUpdate(
+          { date: today },
+          {
+            $setOnInsert: {
+              date: today,
+              status: 'open',
+              entries: [],
+              totalDaily: 0,
+            },
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true },
+        )
+        .exec();
+      return journee;
+    } catch (err) {
+      this.logger.error(`Error getting or creating Journee for ${today}:`, err);
+      const existing = await this.journeeModel.findOne({ date: today }).exec();
+      if (existing) return existing;
+      throw err;
     }
-
-    return journee;
   }
 
   async addEntry(
@@ -41,25 +46,31 @@ export class JourneeService {
     description: string,
     amount: number = 0,
     reference: string = '',
-  ): Promise<JourneeDocument> {
-    const journee = await this.getOrCreateCurrent();
-    
-    if (journee.status === 'closed') {
-      this.logger.error(`Cannot add entry to closed Journee ${journee.date}`);
-      return journee;
+  ): Promise<JourneeDocument | null> {
+    try {
+      const journee = await this.getOrCreateCurrent();
+      if (!journee) return null;
+
+      if (journee.status === 'closed') {
+        this.logger.error(`Cannot add entry to closed Journee ${journee.date}`);
+        return journee;
+      }
+
+      journee.entries.push({
+        entryType: type,
+        type,
+        description,
+        amount,
+        reference,
+        time: new Date(),
+      });
+
+      journee.totalDaily += amount;
+      return await journee.save();
+    } catch (err) {
+      this.logger.error(`Failed to add Journee entry: ${description}`, err);
+      return null;
     }
-
-    journee.entries.push({
-      entryType: type,
-      type,
-      description,
-      amount,
-      reference,
-      time: new Date(),
-    });
-
-    journee.totalDaily += amount;
-    return await journee.save();
   }
 
   async findAll(): Promise<JourneeDocument[]> {

@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Body, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { SettingService } from './setting.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -17,7 +17,22 @@ export class SettingController {
 
   @Patch()
   @Roles('admin')
-  updateSettings(@Body() data: any) {
+  async updateSettings(@Body() data: any, @Req() req: any) {
+    if (Array.isArray(data?.depenseCategories)) {
+      const current = (await this.settingService.getSettings()) as any;
+      const existing: string[] = Array.isArray(current.depenseCategories)
+        ? current.depenseCategories
+        : [];
+      const incoming: string[] = data.depenseCategories.map((c: any) =>
+        String(c),
+      );
+      const removed = existing.some((c) => !incoming.includes(c));
+      if (removed && req.user?.role !== 'super_admin') {
+        throw new ForbiddenException(
+          'Only a super admin can remove depense categories',
+        );
+      }
+    }
     return this.settingService.updateSettings(data);
   }
 }

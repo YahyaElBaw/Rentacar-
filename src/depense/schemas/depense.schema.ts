@@ -23,5 +23,5 @@ export type DepenseDocument = Depense & Document;
 export const DepenseSchema = SchemaFactory.createForClass(Depense);
 
 DepenseSchema.index({ car: 1 });
-DepenseSchema.index({ date: 1 });
+DepenseSchema.index({ date: -1 });
 DepenseSchema.index({ category: 1 });

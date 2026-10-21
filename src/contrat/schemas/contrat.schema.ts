@@ -27,7 +27,10 @@ export class Contrat {
   @Prop({ default: 0 })
   carDailyRate: number;
 
-  @Prop({ default: 'active', enum: ['soon', 'active', 'terminé', 'clôturé', 'cancelled'] })
+  @Prop({
+    default: 'active',
+    enum: ['soon', 'active', 'terminé', 'clôturé', 'cancelled'],
+  })
   status: string;
 
   @Prop({ type: Types.ObjectId, ref: 'User' })
@@ -75,13 +78,42 @@ export class Contrat {
 
   @Prop({ default: '' })
   agency: string;
+
+  @Prop({ default: 50 })
+  carburantLevel: number;
+
+  @Prop({ default: 'Djerba' })
+  lieuDepart: string;
+
+  @Prop({ default: 'Djerba' })
+  lieuRetour: string;
+
+  @Prop({ default: '' })
+  gpsArchiveUrl: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'LotContrat', required: false })
+  lot?: Types.ObjectId;
+
+  @Prop({ default: false })
+  isDeleted: boolean;
+
+  @Prop()
+  deletedAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  deletedBy?: Types.ObjectId;
 }
 
 export type ContratDocument = Contrat & Document;
 export const ContratSchema = SchemaFactory.createForClass(Contrat);
 
-
+ContratSchema.index({ isDeleted: 1 });
 ContratSchema.index({ car: 1 });
 ContratSchema.index({ status: 1 });
 ContratSchema.index({ startDate: 1 });
 ContratSchema.index({ endDate: 1 });
+// Compound index for BookingConflictService.findConflicts() query pattern
+ContratSchema.index({ car: 1, status: 1, startDate: 1, endDate: 1 });
+// Covered compound index for distinct('car') availability lookups
+ContratSchema.index({ status: 1, startDate: 1, endDate: 1, car: 1 });
+ContratSchema.index({ createdAt: -1 });

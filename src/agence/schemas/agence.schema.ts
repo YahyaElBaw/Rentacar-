@@ -46,6 +46,9 @@ export class Agence {
 
   @Prop({ type: Array, default: [] })
   templateFields: TemplateField[];
+
+  @Prop({ default: true })
+  applyTimbreExpense: boolean;
 }
 
 export type AgenceDocument = Agence & Document;

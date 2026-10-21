@@ -24,8 +24,20 @@ export class Setting {
   @Prop({ default: 6 })
   visiteLimit: number;
 
+  @Prop({ default: 130 })
+  speedAlertLimit: number;
+
+  @Prop({ default: 200 })
+  kmPerDayLimit: number;
+
   @Prop({ type: [String], default: [] })
   agencies: string[];
+
+  @Prop({
+    type: [String],
+    default: ['Mechanique', 'Vidange', 'Lavage', 'Depense Generale', 'Timbre fiscal', 'Autre'],
+  })
+  depenseCategories: string[];
 }
 
 export type SettingDocument = Setting & Document;
