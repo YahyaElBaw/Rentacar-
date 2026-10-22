@@ -73,6 +73,9 @@ export class DatabaseReplicationService implements OnModuleInit, OnModuleDestroy
       const conn = await mongoose.createConnection(db.uri, {
         serverSelectionTimeoutMS: 5000,
         connectTimeoutMS: 5000,
+        maxPoolSize: 5,
+        minPoolSize: 1,
+        maxIdleTimeMS: 30000,
       }).asPromise();
 
       this.backupConnections.set(db.id, conn);

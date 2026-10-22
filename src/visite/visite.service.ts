@@ -55,9 +55,13 @@ export class VisiteService {
     return savedVisite;
   }
 
-  async findAll(carId?: string): Promise<Visite[]> {
+  async findAll(carId?: string): Promise<any[]> {
     const query: any = carId ? { car: carId } : {};
-    return this.visiteModel.find(query).populate('car').exec();
+    const q = this.visiteModel.find(query);
+    if (!carId) {
+      q.populate('car', 'brand model matricule');
+    }
+    return q.sort({ date: -1 }).lean().exec() as any;
   }
 
   async findOne(id: string): Promise<Visite> {

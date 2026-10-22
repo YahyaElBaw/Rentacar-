@@ -37,6 +37,9 @@ import { DatabaseModule } from './database/database.module';
           config.get<string>('MONGODB_URI') || 'mongodb://127.0.0.1:27017/rentacar',
         serverSelectionTimeoutMS: 5000,
         connectTimeoutMS: 5000,
+        maxPoolSize: 10, // Optimized for MongoDB Atlas M0 (Free Tier max 500 connections)
+        minPoolSize: 1,
+        maxIdleTimeMS: 30000, // Automatically close idle sockets after 30s
       }),
     }),
     DatabaseModule,

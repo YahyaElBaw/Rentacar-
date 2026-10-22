@@ -139,7 +139,7 @@ export class ContratService implements OnModuleInit {
     createContratDto: any,
     actor?: any,
   ): Promise<ContratDocument> {
-    const car = await this.carModel.findById(createContratDto.car).exec();
+    const car = await this.carModel.findById(createContratDto.car).populate('agence').exec();
     if (!car) throw new NotFoundException('Car not found');
 
     if (createContratDto.clients && createContratDto.clients.length > 2) {
@@ -183,9 +183,15 @@ export class ContratService implements OnModuleInit {
     createContratDto.totalAmount =
       Math.round((baseAmount + tvaAmount) * 100) / 100;
 
-    // Tax is now an internal expense (Depense), client doesn't pay it
-    if (settings.contractTaxEnabled) {
+    // Check if car's agency applies contract frais / timbre expense (relative to agency)
+    const carAgence: any = (car as any)?.agence;
+    const isAgencyTimbreActive = !carAgence || carAgence.applyTimbreExpense !== false;
+
+    // Tax is an internal fee/expense (Depense), client doesn't pay it; relative to agency
+    if (settings.contractTaxEnabled && isAgencyTimbreActive) {
       taxAmount = currentTaxValue || 0;
+    } else {
+      taxAmount = 0;
     }
 
     createContratDto.contractTaxValue = taxAmount;
@@ -267,6 +273,10 @@ export class ContratService implements OnModuleInit {
 
     if (targetLot) {
       createdContrat.lot = targetLot._id;
+      const lotAgence = (targetLot as any)?.agence;
+      if (lotAgence && typeof lotAgence === 'object' && lotAgence.applyTimbreExpense === false) {
+        createdContrat.contractTaxValue = 0;
+      }
     }
 
     const savedContrat = await createdContrat.save();
@@ -293,16 +303,8 @@ export class ContratService implements OnModuleInit {
         .exec();
     }
 
-    // Create a Depense (Expense) for the contract fee if it exists
-    if (taxAmount > 0) {
-      await new this.depenseModel({
-        car: car._id,
-        date: new Date(),
-        amount: taxAmount,
-        category: 'Frais sur contrat',
-        description: `Taxe/Frais pour le contrat ${savedContrat.reference}`,
-      }).save();
-    }
+    // Note: Contract frais are NOT added as a Depense on contract creation day.
+    // As per user specification, they are summed and added as a Depense when the carnet is closed.
 
     // If linked to reservation, update reservation status and link
     if (createContratDto.reservation) {

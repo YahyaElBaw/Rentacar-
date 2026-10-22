@@ -4,6 +4,8 @@ import { Model } from 'mongoose';
 import { Car, CarDocument } from './schemas/car.schema';
 import { Reservation, ReservationDocument } from '../reservation/schemas/reservation.schema';
 import { Contrat, ContratDocument } from '../contrat/schemas/contrat.schema';
+import { Visite, VisiteDocument } from '../visite/schemas/visite.schema';
+import { Depense, DepenseDocument } from '../depense/schemas/depense.schema';
 import { BookingConflictService } from '../shared/booking-conflict.service';
 import { EventsGateway } from '../events/events.gateway';
 
@@ -13,6 +15,8 @@ export class CarService {
     @InjectModel(Car.name) private carModel: Model<CarDocument>,
     @InjectModel(Reservation.name) private reservationModel: Model<ReservationDocument>,
     @InjectModel(Contrat.name) private contratModel: Model<ContratDocument>,
+    @InjectModel(Visite.name) private visiteModel: Model<VisiteDocument>,
+    @InjectModel(Depense.name) private depenseModel: Model<DepenseDocument>,
     private readonly bookingConflictService: BookingConflictService,
     private readonly eventsGateway: EventsGateway,
   ) {}
@@ -75,7 +79,7 @@ export class CarService {
 
     let cars = await this.carModel
       .find(query)
-      .select('brand model matricule color dailyRate mileage isAvailable agence category departureDate nextTechnicalVisitDate nextOilChangeMileage insuranceDate disabled createdAt')
+      .select('brand model matricule color dailyRate mileage isAvailable agence category departureDate nextTechnicalVisitDate nextOilChangeMileage insuranceDate disabled documents createdAt')
       .populate('agence', 'name')
       .lean()
       .exec();
@@ -128,20 +132,78 @@ export class CarService {
     return ids;
   }
 
-  async findOne(id: string): Promise<CarDocument> {
-    const car = (await this.carModel
-      .findById(id)
-      .populate('agence')
-      .populate('reservations')
-      .populate('visites')
-      .populate('vidanges')
-      .populate('depenses')
-      .exec()) as CarDocument;
+  async findOne(id: string): Promise<any> {
+    const [car, contrats, visites, depenses, reservations] = await Promise.all([
+      this.carModel
+        .findById(id)
+        .populate('agence', 'name')
+        .populate('vidanges')
+        .lean()
+        .exec(),
+      this.contratModel
+        .find({ car: id, isDeleted: { $ne: true } })
+        .populate({ path: 'clients', model: 'Client', select: 'firstName lastName cin phone' })
+        .sort({ startDate: -1 })
+        .lean()
+        .exec(),
+      this.visiteModel
+        .find({ car: id })
+        .sort({ date: -1 })
+        .lean()
+        .exec(),
+      this.depenseModel
+        .find({ car: id })
+        .sort({ date: -1 })
+        .lean()
+        .exec(),
+      this.reservationModel
+        .find({ car: id })
+        .populate({ path: 'clients', model: 'Client', select: 'firstName lastName cin phone' })
+        .sort({ startDate: -1 })
+        .lean()
+        .exec(),
+    ]);
+
     if (!car) throw new NotFoundException(`Car with ID ${id} not found`);
-    return car;
+
+    const carData = car as any;
+    carData.contrats = contrats || [];
+    carData.visites = visites && visites.length > 0 ? visites : (carData.visites || []);
+    carData.depenses = depenses && depenses.length > 0 ? depenses : (carData.depenses || []);
+    carData.reservations = reservations && reservations.length > 0 ? reservations : (carData.reservations || []);
+    
+    // Deduplicate documents: keep the latest valid entry per type
+    if (carData.documents && Array.isArray(carData.documents) && carData.documents.length > 0) {
+      const docMap = new Map<string, any>();
+      for (const d of carData.documents) {
+        if (d?.type && d?.url) {
+          docMap.set(d.type, d);
+        }
+      }
+      const uniqueDocs = Array.from(docMap.values());
+      if (uniqueDocs.length < carData.documents.length) {
+        // Automatically clean up accumulated duplicate documents in DB
+        await this.carModel.findByIdAndUpdate(id, { documents: uniqueDocs }).exec();
+        carData.documents = uniqueDocs;
+      }
+    } else {
+      carData.documents = carData.documents || [];
+    }
+
+    return carData;
   }
 
   async update(id: string, updateCarDto: any): Promise<CarDocument> {
+    if (updateCarDto.documents && Array.isArray(updateCarDto.documents)) {
+      const docMap = new Map<string, any>();
+      for (const d of updateCarDto.documents) {
+        if (d?.type && d?.url) {
+          docMap.set(d.type, d);
+        }
+      }
+      updateCarDto.documents = Array.from(docMap.values());
+    }
+
     const car = (await this.carModel
       .findByIdAndUpdate(id, updateCarDto, { new: true })
       .exec()) as CarDocument;
@@ -157,19 +219,23 @@ export class CarService {
     id: string,
     document: Partial<Car['documents'][number]>,
   ): Promise<any> {
-    const car = await this.carModel
-      .findByIdAndUpdate(
-        id,
-        { $push: { documents: document } },
-        { new: true },
-      )
-      .exec();
-    if (!car) throw new NotFoundException(`Car with ID ${id} not found`);
+    const existing = await this.carModel.findById(id);
+    if (!existing) throw new NotFoundException(`Car with ID ${id} not found`);
+
+    let docs = existing.documents || [];
+    if (document.type) {
+      docs = docs.filter((d: any) => d.type !== document.type);
+    }
+    docs.push(document as any);
+
+    existing.documents = docs;
+    await existing.save();
+
     this.eventsGateway.broadcastDataChange('car:change', {
       action: 'updated',
-      carId: car._id,
+      carId: existing._id,
     });
-    return car.documents[car.documents.length - 1];
+    return existing.documents[existing.documents.length - 1];
   }
 
   async removeDocument(id: string, documentId: string): Promise<any> {

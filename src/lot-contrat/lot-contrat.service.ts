@@ -294,7 +294,8 @@ export class LotContratService {
               {
                 amount: totalTimbreAmount,
                 date: new Date(),
-                description: `Frais de timbre fiscal carnet « ${lot.name} » (${agence?.name || 'Agence'}) : ${totalDays} jour(s) de location (${validContratsCount} contrats à ${timbreValue} TND/jour)`,
+                category: 'Frais sur contrat',
+                description: `Frais sur contrat carnet « ${lot.name} » (${agence?.name || 'Agence'}) : ${totalDays} jour(s) de location (${validContratsCount} contrats à ${timbreValue} TND/jour)`,
               },
               { new: true },
             );
@@ -304,8 +305,8 @@ export class LotContratService {
             const created = new this.depenseModel({
               date: new Date(),
               amount: totalTimbreAmount,
-              category: 'Timbre fiscal',
-              description: `Frais de timbre fiscal carnet « ${lot.name} » (${agence?.name || 'Agence'}) : ${totalDays} jour(s) de location (${validContratsCount} contrats à ${timbreValue} TND/jour)`,
+              category: 'Frais sur contrat',
+              description: `Frais sur contrat carnet « ${lot.name} » (${agence?.name || 'Agence'}) : ${totalDays} jour(s) de location (${validContratsCount} contrats à ${timbreValue} TND/jour)`,
             });
             savedDepense = await created.save();
           }

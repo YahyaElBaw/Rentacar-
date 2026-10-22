@@ -25,7 +25,7 @@ export class DatabaseHealthService implements OnModuleInit, OnModuleDestroy {
       void this.checkAllDatabases();
       this.checkInterval = setInterval(() => {
         void this.checkAllDatabases();
-      }, 30000); // Check every 30 seconds
+      }, 60000); // Check every 60 seconds (prevents connection spamming on M0 clusters)
     }, 5000);
   }
 
@@ -95,11 +95,28 @@ export class DatabaseHealthService implements OnModuleInit, OnModuleDestroy {
     error?: string;
   }> {
     const start = Date.now();
+
+    // 1. If this is the primary database, reuse the existing connection (NO new socket created!)
+    if (db.role === 'primary' && this.primaryConnection.readyState === 1 && this.primaryConnection.db) {
+      try {
+        await this.primaryConnection.db.admin().ping();
+        const latencyMs = Date.now() - start;
+        const maxLatency = this.configService.getRegistry().maxLatencyMs || 4000;
+        const status = latencyMs > maxLatency ? 'degraded' : 'healthy';
+        return { status, latencyMs };
+      } catch (err: any) {
+        return { status: 'down', latencyMs: 9999, error: err?.message };
+      }
+    }
+
+    // 2. For external backup databases, use a single temporary socket
     let conn: mongoose.Connection | null = null;
     try {
       conn = await mongoose.createConnection(db.uri, {
-        serverSelectionTimeoutMS: 4000,
-        connectTimeoutMS: 4000,
+        serverSelectionTimeoutMS: 3000,
+        connectTimeoutMS: 3000,
+        maxPoolSize: 1, // Strictly 1 socket for health ping
+        minPoolSize: 1,
       }).asPromise();
 
       const admin = conn.db?.admin();

@@ -51,9 +51,13 @@ export class VidangeService {
     return savedVidange;
   }
 
-  async findAll(carId?: string): Promise<VidangeDocument[]> {
+  async findAll(carId?: string): Promise<any[]> {
     const query: any = carId ? { car: carId } : {};
-    return this.vidangeModel.find(query).populate('car').exec();
+    const q = this.vidangeModel.find(query);
+    if (!carId) {
+      q.populate('car', 'brand model matricule');
+    }
+    return q.sort({ date: -1 }).lean().exec() as any;
   }
 
   async findOne(id: string): Promise<VidangeDocument> {
